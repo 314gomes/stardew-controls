@@ -1,15 +1,15 @@
 import pygame
 
-class FishingRules:
+class FishingBarRules:
 	def __init__(self):
 		self.mass = 1.0
-		self.gravity = 7
+		self.gravity = 3.0
 		self.position_range = [0, 1]
 		self.speed_range = [-0.3, 0.3]
 		self.acc_range = [-1, 1]
 		self.restitution = 0.50
 		self.speed_epsilon = 0.05
-		self.force_ext = 10
+		self.force_ext = 5
 		
 	def _clamp(self, value, range):
 		if value < range[0]:
@@ -29,7 +29,7 @@ class FishingRules:
 	def calculate_partially_elastic_collision(self, pos, speed):
 		if pos < self.position_range[0] or pos > self.position_range[1]:
 			speed = -speed * self.restitution
-			speed = FishingRules().apply_epsilon(speed, FishingRules().speed_epsilon)
+			speed = FishingBarRules().apply_epsilon(speed, FishingBarRules().speed_epsilon)
 			pos = self._clamp(pos, self.position_range)
 
 		return pos, speed
@@ -58,7 +58,7 @@ class FishingBar:
 		self._pct_pos = 0.0
 		self._pct_vel = 0.0
 		self._pct_acc = 0.0
-		self._pct_force_weight = - FishingRules().gravity * FishingRules().mass
+		self._pct_force_weight = - FishingBarRules().gravity * FishingBarRules().mass
 
 		self.fishing_bar_top_asset = fishing_assets.subsurface(pygame.Rect(38, 0, 9, 2)).convert_alpha()
 		self.fishing_bar_middle_asset = fishing_assets.subsurface(pygame.Rect(38, 2, 9, 1)).convert_alpha()
@@ -104,9 +104,9 @@ class FishingBar:
 		# Update fishing bar physics
 		self._pct_vel += self._pct_acc * time_delta_s
 		self._pct_pos += self._pct_vel * time_delta_s
-		self._pct_acc = (FishingRules().force_ext * is_button_pressed + self._pct_force_weight) / FishingRules().mass
+		self._pct_acc = (FishingBarRules().force_ext * is_button_pressed + self._pct_force_weight) / FishingBarRules().mass
 		
-		self._pct_pos, self._pct_vel = FishingRules().calculate_partially_elastic_collision(self._pct_pos, self._pct_vel)
+		self._pct_pos, self._pct_vel = FishingBarRules().calculate_partially_elastic_collision(self._pct_pos, self._pct_vel)
 
 		# Update fishing bar position
 		self.set_fishing_bar_pct(self._pct_pos)
