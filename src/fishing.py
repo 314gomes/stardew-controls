@@ -30,6 +30,7 @@ class FishingBarRules:
 		if pos < self.position_range[0] or pos > self.position_range[1]:
 			speed = -speed * self.restitution
 			speed = FishingBarRules().apply_epsilon(speed, FishingBarRules().speed_epsilon)
+			# speed = self._clamp(speed, self.speed_range)
 			pos = self._clamp(pos, self.position_range)
 
 		return pos, speed
