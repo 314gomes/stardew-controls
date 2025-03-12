@@ -1,4 +1,5 @@
 import pygame
+import math
 
 class FishingBarRules:
 	def __init__(self):
@@ -34,6 +35,45 @@ class FishingBarRules:
 			pos = self._clamp(pos, self.position_range)
 
 		return pos, speed
+
+class FishingReel:
+	def __init__(self, fishing_assets, scale_factor):
+		self.scale_factor = scale_factor
+		self.reel_asset = fishing_assets.subsurface(pygame.Rect(39, 6, 3, 8)).convert_alpha()
+		self.reel_asset = pygame.transform.scale_by(self.reel_asset, self.scale_factor)
+		# self.reel_asset = pygame.transform
+
+		self.reel_position = self.reel_asset.get_rect()
+		self.reel_position = self.reel_position.move(5 * self.scale_factor, 128 * self.scale_factor)
+		self.reel_position = self.reel_position.move(-1 * self.scale_factor, -self.reel_asset.get_height() + 1 * self.scale_factor)
+
+		self.angular_position = 0
+		# angular velocities in degrees per second
+		self.angular_velocity_active = - 360 * 3
+		self.angular_velocity_inactive = 180
+
+	def draw(self, screen):
+		# screen.blit(self.reel_asset, self.reel_position)
+		rotated_reel_asset = pygame.transform.rotate(self.reel_asset, self.angular_position)
+		height = self.reel_asset.get_height()
+		
+		# x_mov = 0
+		# y_mov = 0
+		
+		x_mov = -(height/2) * math.sin(math.radians(self.angular_position))
+		y_mov = -(height/2) * math.cos(math.radians(self.angular_position))
+
+		rotated_reel_pos = rotated_reel_asset.get_rect(center = self.reel_position.midbottom)
+		rotated_reel_pos = rotated_reel_pos.move(0, -1 * self.scale_factor)
+		rotated_reel_pos = rotated_reel_pos.move(x_mov, y_mov)
+		
+		screen.blit(rotated_reel_asset, rotated_reel_pos)
+
+	def tick(self, time_delta_s:float, is_active:bool):
+		if is_active:
+			self.angular_position += self.angular_velocity_active * time_delta_s
+		else:
+			self.angular_position += self.angular_velocity_inactive * time_delta_s
 
 class FishingFish:
 	def __init__(self, fishing_assets, scale_factor):
@@ -132,6 +172,8 @@ class FishingGame:
 		
 		self.fish = FishingFish(fishing_assets, self.scale_factor)
 
+		self.reel = FishingReel(fishing_assets, self.scale_factor)
+
 		self.fish_in_fishing_bar = True
 
 	def _update_fish_collision(self):
@@ -149,13 +191,16 @@ class FishingGame:
 			self.player_bar.draw(screen)
 		else:
 			self.player_bar.draw(screen, alpha = 100)
-		
+
+		self.reel.draw(screen)
+
 		self.fish.draw(screen)
 
 	def tick(self, is_playerbutton_pressed: bool):
 		time_delta = self.clock.get_time() / 1000.0
 		self.player_bar.tick(time_delta, is_playerbutton_pressed)
 		self._update_fish_collision()
+		self.reel.tick(time_delta, self.fish_in_fishing_bar)
 		...
 
 	
