@@ -41,7 +41,7 @@ class FishingFish:
 		self.fish_asset = fishing_assets.subsurface(pygame.Rect(47, 0, 19, 19)).convert_alpha()
 		self.fish_asset = pygame.transform.scale_by(self.fish_asset, self.fish_scale_factor)
 
-		self.fish_position = self.fish_asset.get_rect().move(17 * self.scale_factor, 3 * self.scale_factor)
+		self.fish_position = self.fish_asset.get_rect().move(17 * self.scale_factor, 3 * self.scale_factor + 60 * self.scale_factor)
 
 	def draw(self, screen):
 		screen.blit(self.fish_asset, self.fish_position)
@@ -86,6 +86,11 @@ class FishingBar:
 	def get_height_px(self):
 		return self.fishing_bar_top_asset.get_height() + self.fishing_bar_middle_asset.get_height() + self.fishing_bar_bottom_asset.get_height()
 
+	def get_fishing_bar_bounding_rect(self):
+		rect = self.fishing_bar_position.copy()
+		rect.height = self.get_height_px()
+		return rect
+
 	def _set_yoff(self, yoff):
 		self.fishing_bar_position.y = yoff + 3 * self.scale_factor
 
@@ -126,17 +131,30 @@ class FishingGame:
 		
 		self.fish = FishingFish(fishing_assets, self.scale_factor)
 
-	def _is_fish_in_fishing_bar(self):
-		return False
+		self.fish_in_fishing_bar = True
+
+	def _update_fish_collision(self):
+		fish_rect = self.fish.fish_position
+		fishing_bar_rect = self.player_bar.get_fishing_bar_bounding_rect()
+		if fish_rect.colliderect(fishing_bar_rect):
+			self.fish_in_fishing_bar = True
+		else:
+			self.fish_in_fishing_bar = False
 
 	def draw(self, screen):
 		screen.blit(self.background_asset, self.fishing_background_position)
-		self.player_bar.draw(screen)
+		
+		if self.fish_in_fishing_bar:
+			self.player_bar.draw(screen)
+		else:
+			self.player_bar.draw(screen, alpha = 100)
+		
 		self.fish.draw(screen)
 
 	def tick(self, is_playerbutton_pressed: bool):
 		time_delta = self.clock.get_time() / 1000.0
 		self.player_bar.tick(time_delta, is_playerbutton_pressed)
+		self._update_fish_collision()
 		...
 
 	
