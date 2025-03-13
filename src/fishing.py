@@ -127,6 +127,13 @@ class FishingFish:
 	def draw(self, screen):
 		screen.blit(self.fish_asset, self.fish_position)
 
+	def get_bounding_rect(self):
+		bounding_rect = pygame.Rect(0, 0, 0, 0)
+		bounding_rect.width = self.fish_asset.get_width()
+		bounding_rect.height = self.fish_asset.get_height() * 0.3
+		bounding_rect.center = self.fish_position.center
+		return bounding_rect
+
 	def tick(self, time_delta_s:float):
 		...
 
@@ -219,7 +226,7 @@ class FishingGame:
 		self.fish_in_fishing_bar = True
 
 	def _update_fish_collision(self):
-		fish_rect = self.fish.fish_position
+		fish_rect = self.fish.get_bounding_rect()
 		fishing_bar_rect = self.player_bar.get_fishing_bar_bounding_rect()
 		if fish_rect.colliderect(fishing_bar_rect):
 			self.fish_in_fishing_bar = True
