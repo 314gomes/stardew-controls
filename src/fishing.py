@@ -1,6 +1,46 @@
 import pygame
 import math
 
+class FishingProgressBar:
+	def __init__(self, scale_factor):
+		self.scale_factor = scale_factor
+		self.progress_bar = pygame.Rect(0, 0, 4 * self.scale_factor, 0 * self.scale_factor)
+		self.progress_bar_bottom_left = pygame.Rect(32 * self.scale_factor, 146 * self.scale_factor, 0, 0)
+		self.max_height = 144 * self.scale_factor
+		self._progress = 0.0
+		# how many pct to increase per second when catching
+		self._progress_increase_rate = 1.0 / 5.0
+		# how many pct to increase per second when catching
+		self.progress_decrease_rate = self._progress_increase_rate * 0.6
+
+	def _set_progress(self, progress:float):
+		if progress < 0 or progress > 1:
+			raise ValueError("Progress must be between 0 and 1")
+		self.progress_bar.height = progress * self.max_height
+		self.progress_bar.bottomleft = self.progress_bar_bottom_left.bottomleft
+
+	def tick(self, is_catching:bool, time_delta_s:float):
+		if is_catching:
+			self._progress += self._progress_increase_rate * time_delta_s
+		else:
+			self._progress -= self.progress_decrease_rate * time_delta_s
+		
+		fish_caught_status = self._progress
+		self._progress = max(0, min(1, self._progress))
+
+		self._set_progress(self._progress)
+
+		return fish_caught_status
+
+	def draw(self, screen:pygame.SurfaceType):
+		color = pygame.Color(0, 0, 0)
+
+		hsva = (120 * self._progress, 100, 100, 100)
+		color.hsva = hsva
+		
+		screen.fill(color, self.progress_bar)
+
+
 class FishingBarRules:
 	def __init__(self):
 		self.mass = 1.0
@@ -174,6 +214,8 @@ class FishingGame:
 
 		self.reel = FishingReel(fishing_assets, self.scale_factor)
 
+		self.progress_bar = FishingProgressBar(self.scale_factor)
+
 		self.fish_in_fishing_bar = True
 
 	def _update_fish_collision(self):
@@ -196,11 +238,15 @@ class FishingGame:
 
 		self.fish.draw(screen)
 
+		self.progress_bar.draw(screen)
+
 	def tick(self, is_playerbutton_pressed: bool):
 		time_delta = self.clock.get_time() / 1000.0
 		self.player_bar.tick(time_delta, is_playerbutton_pressed)
 		self._update_fish_collision()
 		self.reel.tick(time_delta, self.fish_in_fishing_bar)
+		progress_status = self.progress_bar.tick(self.fish_in_fishing_bar, time_delta)
+
 		...
 
 	
