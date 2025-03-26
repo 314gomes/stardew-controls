@@ -1,5 +1,6 @@
 import pygame
 import math
+import random
 
 class FishingProgressBar:
 	def __init__(self, scale_factor):
@@ -122,7 +123,22 @@ class FishingFish:
 		self.fish_asset = fishing_assets.subsurface(pygame.Rect(47, 0, 19, 19)).convert_alpha()
 		self.fish_asset = pygame.transform.scale_by(self.fish_asset, self.fish_scale_factor)
 
-		self.fish_position = self.fish_asset.get_rect().move(17 * self.scale_factor, 3 * self.scale_factor + 60 * self.scale_factor)
+		# fish physics stuff
+		self._pos_pct = 0
+		self._pos_px = 508
+		self._vel_px = 0
+		self._vel_px = 0
+		self.FloaterSinkerAcc = 0
+
+
+		# variables for fish behavior
+		# carp parameters by default
+		self.difficulty = 15
+		self.motionType = 0
+		self._target_pos_px = (self.difficulty) / 100 * 548
+
+		self.fish_position = self.fish_asset.get_rect().move(17 * self.scale_factor, 3 * self.scale_factor + 141 * self.scale_factor - self.fish_asset.get_height())
+		self.shake = pygame.Rect(0, 0, 0, 0)
 
 	def draw(self, screen):
 		screen.blit(self.fish_asset, self.fish_position)
@@ -134,8 +150,56 @@ class FishingFish:
 		bounding_rect.center = self.fish_position.center
 		return bounding_rect
 
-	def tick(self, time_delta_s:float):
-		...
+	def _set_yoff(self, yoff):
+		self._pos_px = yoff
+		self.fish_position.y = yoff + 3 * self.scale_factor
+
+	def tick(self, time_delta_s:float, catching: bool):
+		# self.motionType {
+		# 0: mixed
+		# 1: dart
+		# 2: smooth
+		# 3: sinker
+		# 4: floater
+		# }
+		calculated_pos_px = self._pos_px
+
+		if (random.random() < (self.difficulty * (1 if self.motionType != 2  else 20) / 4000) and (self.motionType != 2 or self._target_pos_px == -1)):
+			spaceBelow = 532 - self._pos_px
+			spaceAbove = self._pos_px
+			percent = min(99, self.difficulty + random.randint(10, 45)) / 100
+			self._target_pos_px = self._pos_px + random.uniform(min(0 - spaceAbove, spaceBelow), spaceBelow) * percent
+
+		match (self.motionType):
+			case 4:
+				self.FloaterSinkerAcc = max(self.FloaterSinkerAcc - 0.01, -1.5)
+			case 3:
+				self.FloaterSinkerAcc = min(self.FloaterSinkerAcc + 0.01, 1.5)
+		
+		if (abs(self._pos_px - self._target_pos_px) > (3) and self._target_pos_px != -1):
+			bobberAcceleration = (self._target_pos_px - self._pos_px) / (random.randint(10, 30) + (100 - min(100, self.difficulty)))
+			self._vel_px += (bobberAcceleration - self._vel_px) / 5
+		elif (self.motionType != 2 and random.random() < (self.difficulty / 2000)):
+			self._target_pos_px = self._pos_px + (random.uniform(-100, -51) if random.getrandbits(1) else random.uniform(50, 101))
+		else:
+			self._target_pos_px = -1
+		
+		if (self.motionType == 1 and random.random() < (self.difficulty / 1000)):
+			self._target_pos_px = self._pos_px + (random.randint(-100 - self.difficulty * 2, -51) if random.getrandbits(1) else random.randint(50, 101 + self.difficulty * 2)) /548
+
+		calculated_pos_px += self._vel_px + self.FloaterSinkerAcc
+		
+		if (calculated_pos_px > 548):
+			calculated_pos_px = 548
+		elif (calculated_pos_px < 0):
+			calculated_pos_px = 0
+		
+		# if (catching):
+		# 	self.shake.x = random.randint(-10, 11) / 10
+		# 	self.shake.y = random.randint(-10, 11) / 10
+
+		self._set_yoff(calculated_pos_px)
+
 
 class FishingBar:
 	def __init__(self, height, fishing_assets, scale_factor):
@@ -252,8 +316,5 @@ class FishingGame:
 		self.player_bar.tick(time_delta, is_playerbutton_pressed)
 		self._update_fish_collision()
 		self.reel.tick(time_delta, self.fish_in_fishing_bar)
+		self.fish.tick(time_delta, self.fish_in_fishing_bar)
 		progress_status = self.progress_bar.tick(self.fish_in_fishing_bar, time_delta)
-
-		...
-
-	
