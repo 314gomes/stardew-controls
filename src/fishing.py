@@ -141,7 +141,7 @@ class FishingFish:
 		self.shake = pygame.Rect(0, 0, 0, 0)
 
 	def draw(self, screen):
-		screen.blit(self.fish_asset, self.fish_position)
+		screen.blit(self.fish_asset, self.fish_position.move(self.shake.x, self.shake.y))
 
 	def get_bounding_rect(self):
 		bounding_rect = pygame.Rect(0, 0, 0, 0)
@@ -194,9 +194,9 @@ class FishingFish:
 		elif (calculated_pos_px < 0):
 			calculated_pos_px = 0
 		
-		# if (catching):
-		# 	self.shake.x = random.randint(-10, 11) / 10
-		# 	self.shake.y = random.randint(-10, 11) / 10
+		if (catching):
+			self.shake.x = random.randint(-10, 11) / 10
+			self.shake.y = random.randint(-10, 11) / 10
 
 		self._set_yoff(calculated_pos_px)
 
