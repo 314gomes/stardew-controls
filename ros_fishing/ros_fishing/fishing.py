@@ -3,6 +3,10 @@ import pygame
 import math
 import random
 
+import rclpy
+import rclpy.clock
+from rclpy.node import Node
+
 class FishingProgressBar:
 	def __init__(self, scale_factor):
 		self.scale_factor = scale_factor
@@ -270,9 +274,12 @@ class FishingBar:
 		self.set_fishing_bar_pct(self._pct_pos)
 
 class FishingGame:
-	def __init__(self, fishing_background_height, xoff, yoff, clock : pygame.time.Clock):
+	def __init__(self, screen, fishing_background_height, xoff, yoff, clock : rclpy.clock.ROSClock):
+		self.screen = screen
 		self.height = fishing_background_height
 		self.clock = clock
+
+		self.last_time = self.clock.now().nanoseconds
 
 		filepath = os.path.dirname(__file__)
 		fishing_assets = pygame.image.load(filepath + '/fishing.png')
@@ -302,7 +309,9 @@ class FishingGame:
 		else:
 			self.fish_in_fishing_bar = False
 
-	def draw(self, screen):
+	def draw(self, screen: pygame.SurfaceType):
+		screen.fill("blue")
+
 		screen.blit(self.background_asset, self.fishing_background_position)
 		
 		if self.fish_in_fishing_bar:
@@ -317,9 +326,43 @@ class FishingGame:
 		self.progress_bar.draw(screen)
 
 	def tick(self, is_playerbutton_pressed: bool):
-		time_delta = self.clock.get_time() / 1000.0
+		# calculate time delta since last tick in seconds
+		new_time = self.clock.now().nanoseconds
+		time_delta = (new_time - self.last_time) / 1e9
+		self.last_time = new_time
+
+		# update game logic
 		self.player_bar.tick(time_delta, is_playerbutton_pressed)
 		self._update_fish_collision()
 		self.reel.tick(time_delta, self.fish_in_fishing_bar)
 		self.fish.tick(time_delta, self.fish_in_fishing_bar)
 		progress_status = self.progress_bar.tick(self.fish_in_fishing_bar, time_delta)
+
+		# update screen
+		self.draw(self.screen)
+
+class FishingNode(Node):
+	def __init__(self):
+		super().__init__('fishing_node')
+		self.get_logger().info('Fishing node started')
+		pygame.init()
+		self.fishing_game = FishingGame(pygame.display.set_mode((800, 600)), 600, 0, 0, self.get_clock())
+		timer_period = 1/60  # timer for 60 FPS
+		self.timer = self.create_timer(timer_period, self.timer_callback)
+		self.i = 0
+
+	def timer_callback(self):
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				pygame.quit()
+				self.destroy_node()
+				rclpy.shutdown()
+				return
+
+		# game logic
+		is_player_button_pressed = pygame.mouse.get_pressed()[0]
+		# self.get_logger().info(f'Player button pressed: {is_player_button_pressed}')
+		self.fishing_game.tick(is_player_button_pressed)
+
+		# flip() the display to put your work on screen
+		pygame.display.flip()

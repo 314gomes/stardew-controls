@@ -1,39 +1,36 @@
-# Example file showing a basic pygame "game loop"
-import pygame
 from . import fishing
+import rclpy
 
 def main():
-    # pygame setup
-    pygame.init()
-    screen = pygame.display.set_mode((800, 600))
+	#spin node
 
-    pygame.display.set_caption("Fishing Game")
+    rclpy.init()
+    node = fishing.FishingNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+    
+    ...
+	# # pygame setup
+    # pygame.init()
+    # screen = pygame.display.set_mode((800, 600))
 
-    clock = pygame.time.Clock()
-    running = True
+    # pygame.display.set_caption("Fishing Game")
 
-    fishing_game = fishing.FishingGame(screen.get_height(), 0, 0, clock)
+    # clock = pygame.time.Clock()
+    # running = True
 
-    while running:
-        # poll for events
-        # pygame.QUIT event means the user clicked X to close your window
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+    # fishing_game = fishing.FishingGame(screen.get_height(), 0, 0, clock)
 
-        # fill the screen with a color to wipe away anything from last frame
-        screen.fill("blue")
+    # while running:
+    #     # poll for events
+    #     # pygame.QUIT event means the user clicked X to close your window
+    #     
 
-        # game logic
-        is_player_button_pressed = pygame.mouse.get_pressed()[0]
-        fishing_game.tick(is_player_button_pressed)
+    #     clock.tick(60)  # limits FPS
 
-        # RENDER YOUR GAME HERE
-        fishing_game.draw(screen)
-
-        # flip() the display to put your work on screen
-        pygame.display.flip()
-
-        clock.tick(60)  # limits FPS
-
-    pygame.quit()
+    # pygame.quit()
