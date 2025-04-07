@@ -1,3 +1,4 @@
+import os
 import pygame
 import math
 import random
@@ -273,7 +274,11 @@ class FishingGame:
 		self.height = fishing_background_height
 		self.clock = clock
 
-		fishing_assets = pygame.image.load("assets/fishing.png")
+		filepath = os.path.dirname(__file__)
+		fishing_assets = pygame.image.load(filepath + '/fishing.png')
+		pygame.display.set_icon(fishing_assets.convert_alpha().subsurface(pygame.Rect(47, 0, 19, 19)))
+
+
 		self.background_asset = fishing_assets.subsurface(pygame.Rect(0, 0, 38, 150)).convert_alpha()
 		self.scale_factor = self.height/self.background_asset.get_height()
 		self.background_asset = pygame.transform.scale_by(self.background_asset, self.scale_factor)
