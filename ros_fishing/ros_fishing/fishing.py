@@ -6,6 +6,7 @@ import random
 import rclpy
 import rclpy.clock
 from rclpy.node import Node
+from std_msgs.msg import Float64, Bool
 
 class FishingProgressBar:
 	def __init__(self, scale_factor):
@@ -205,6 +206,15 @@ class FishingFish:
 
 		self._set_yoff(calculated_pos_px)
 
+	def get_fish_relative_to_bar_pct(self, bar_height_px):
+		min_pos_px = 548 - bar_height_px/2
+		max_pos_px = bar_height_px/2 + 3 * self.scale_factor - self.fish_asset.get_height()
+
+		self._pos_pct = (self._pos_px - min_pos_px) / (max_pos_px - min_pos_px)
+		self._pos_pct = max(0, min(1, self._pos_pct))
+
+		return self._pos_pct
+
 
 class FishingBar:
 	def __init__(self, height, fishing_assets, scale_factor):
@@ -273,6 +283,8 @@ class FishingBar:
 		# Update fishing bar position
 		self.set_fishing_bar_pct(self._pct_pos)
 
+		return self._pct_pos
+
 class FishingGame:
 	def __init__(self, screen, fishing_background_height, xoff, yoff, clock : rclpy.clock.ROSClock):
 		self.screen = screen
@@ -292,14 +304,14 @@ class FishingGame:
 		self.fishing_background_position = self.background_asset.get_rect()
 
 		self.player_bar = FishingBar(30, fishing_assets, self.scale_factor)
-		
 		self.fish = FishingFish(fishing_assets, self.scale_factor)
-
 		self.reel = FishingReel(fishing_assets, self.scale_factor)
-
 		self.progress_bar = FishingProgressBar(self.scale_factor)
 
 		self.fish_in_fishing_bar = True
+		self.fish_pct = 0.0
+		self.bar_pct = 0.0
+		self.progress_pct = 0.0
 
 	def _update_fish_collision(self):
 		fish_rect = self.fish.get_bounding_rect()
@@ -332,11 +344,13 @@ class FishingGame:
 		self.last_time = new_time
 
 		# update game logic
-		self.player_bar.tick(time_delta, is_playerbutton_pressed)
+		self.bar_pct = self.player_bar.tick(time_delta, is_playerbutton_pressed)
 		self._update_fish_collision()
 		self.reel.tick(time_delta, self.fish_in_fishing_bar)
 		self.fish.tick(time_delta, self.fish_in_fishing_bar)
-		progress_status = self.progress_bar.tick(self.fish_in_fishing_bar, time_delta)
+		self.fish_pct = self.fish.get_fish_relative_to_bar_pct(self.player_bar.get_height_px())
+
+		self.progress_pct = self.progress_bar.tick(self.fish_in_fishing_bar, time_delta)
 
 		# update screen
 		self.draw(self.screen)
@@ -349,7 +363,12 @@ class FishingNode(Node):
 		self.fishing_game = FishingGame(pygame.display.set_mode((800, 600)), 600, 0, 0, self.get_clock())
 		timer_period = 1/60  # timer for 60 FPS
 		self.timer = self.create_timer(timer_period, self.timer_callback)
-		self.i = 0
+
+		# Initialize publishers
+		self.fish_pct_publisher = self.create_publisher(Float64, 'fish_pct', 10)
+		self.bar_pct_publisher = self.create_publisher(Float64, 'bar_pct', 10)
+		self.progress_pct_publisher = self.create_publisher(Float64, 'progress_pct', 10)
+		self.fish_in_fishing_bar_publisher = self.create_publisher(Bool, 'fish_in_fishing_bar', 10)
 
 	def timer_callback(self):
 		for event in pygame.event.get():
@@ -363,6 +382,20 @@ class FishingNode(Node):
 		is_player_button_pressed = pygame.mouse.get_pressed()[0]
 		# self.get_logger().info(f'Player button pressed: {is_player_button_pressed}')
 		self.fishing_game.tick(is_player_button_pressed)
+
+		# publish game data
+		fish_pct_msg = Float64()
+		fish_pct_msg.data = float(self.fishing_game.fish_pct)
+		self.fish_pct_publisher.publish(fish_pct_msg)
+		bar_pct_msg = Float64()
+		bar_pct_msg.data = float(self.fishing_game.bar_pct)
+		self.bar_pct_publisher.publish(bar_pct_msg)
+		progress_pct_msg = Float64()
+		progress_pct_msg.data = float(self.fishing_game.progress_pct)
+		self.progress_pct_publisher.publish(progress_pct_msg)
+		fish_in_fishing_bar_msg = Bool()
+		fish_in_fishing_bar_msg.data = self.fishing_game.fish_in_fishing_bar
+		self.fish_in_fishing_bar_publisher.publish(fish_in_fishing_bar_msg)
 
 		# flip() the display to put your work on screen
 		pygame.display.flip()
