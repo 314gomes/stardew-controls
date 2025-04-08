@@ -8,6 +8,9 @@ import rclpy.clock
 from rclpy.node import Node
 from std_msgs.msg import Float64, Bool
 
+from ros_fishing_interfaces.action import Fishing
+
+
 class FishingProgressBar:
 	def __init__(self, scale_factor):
 		self.scale_factor = scale_factor

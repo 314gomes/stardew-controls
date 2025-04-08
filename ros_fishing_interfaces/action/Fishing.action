@@ -1,0 +1,13 @@
+# Request
+# (Empty request)
+
+---
+
+# Result
+bool success
+string message
+
+---
+
+# Feedback
+float64 progress
