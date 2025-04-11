@@ -396,6 +396,7 @@ class FishingNode(Node):
 		)
 
 		self.current_goal = None
+		self.button_msgs = dict()
 
 	def new_goal_callback(self, goal_handle: rclpy.action.server.ServerGoalHandle):
 		# only one goal at a time
@@ -418,11 +419,29 @@ class FishingNode(Node):
 		bar_pct_publisher = self.create_publisher(Float64, '/bar_pct/id_' + goal_id_string, 10)
 		fish_in_fishing_bar_publiser = self.create_publisher(Bool, '/fish_in_fishing_bar/id_' + goal_id_string, 10)
 
+		# Initialize button state listener
+		# This will basically create a new function for each goal id
+		button_listener = self.create_subscription(
+			Bool,
+			'/fishing_button_state/id_' + goal_id_string,
+			lambda msg: self.button_listener_callback(msg, goal_id_string),
+			10
+		)
+
 		result = Fishing.Result()
 		result.message = 'Fish name should go here!'
 		is_player_button_pressed = False
 
 		while executing_game:
+			# listen to button state topic
+			rclpy.spin_once(self, timeout_sec=0.01)
+
+			# check if the button is pressed
+			if self.button_msgs.get(goal_id_string, None) is not None:
+				is_player_button_pressed = self.button_msgs[goal_id_string]
+				self.button_msgs[goal_id_string] = None # message was read!
+			
+			# check for button presses on window
 			for event in fishing_game.get_pygame_events():
 				if event.type == pygame.QUIT:
 					goal_handle.abort()
@@ -463,19 +482,17 @@ class FishingNode(Node):
 			fish_in_fishing_bar_msg.data = fishing_game.fish_in_fishing_bar
 			fish_in_fishing_bar_publiser.publish(fish_in_fishing_bar_msg)
 
-			
-
 			# check if the game is over
-			# if fishing_game.progress_pct >= 1.0:
-			# 	self.get_logger().info('Game won')
-			# 	executing_game = False
-			# 	goal_handle.succeed()
-			# 	result.success = True
-			# elif fishing_game.progress_pct <= 0.0:
-			# 	self.get_logger().info('Game lost')
-			# 	executing_game = False
-			# 	goal_handle.abort()
-			# 	result.success = False
+			if fishing_game.progress_pct >= 1.0:
+				self.get_logger().info('Game won')
+				executing_game = False
+				goal_handle.succeed()
+				result.success = True
+			elif fishing_game.progress_pct <= 0.0:
+				self.get_logger().info('Game lost')
+				executing_game = False
+				goal_handle.succeed()
+				result.success = False
 
 		fishing_game = None
 		self.get_logger().info('Game ended')
@@ -484,6 +501,12 @@ class FishingNode(Node):
 		self.destroy_publisher(fish_pct_publisher)
 		self.destroy_publisher(bar_pct_publisher)
 		self.destroy_publisher(fish_in_fishing_bar_publiser)
+		# remove listener
+		self.destroy_subscription(button_listener)
 
 		self.current_goal = None
 		return result
+	
+	def button_listener_callback(self, msg:Bool, goal_id_string: str):
+		self.get_logger().debug('Button state: %s' % msg.data + "for id:" + goal_id_string)
+		self.button_msgs[goal_id_string] = msg.data
