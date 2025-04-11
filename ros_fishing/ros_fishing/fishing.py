@@ -8,8 +8,12 @@ import rclpy.clock
 from rclpy.node import Node
 from std_msgs.msg import Float64, Bool
 
-from ros_fishing_interfaces.action import Fishing
+import uuid
 
+import rclpy.action
+from ros_fishing_interfaces.action import Fishing
+from example_interfaces.action import Fibonacci
+from rclpy.action import ActionServer
 
 class FishingProgressBar:
 	def __init__(self, scale_factor):
@@ -289,12 +293,11 @@ class FishingBar:
 		return self._pct_pos
 
 class FishingGame:
-	def __init__(self, screen, fishing_background_height, xoff, yoff, clock : rclpy.clock.ROSClock):
-		self.screen = screen
-		self.height = fishing_background_height
-		self.clock = clock
-
-		self.last_time = self.clock.now().nanoseconds
+	def __init__(self):
+		pygame.init()
+		self.clock = pygame.time.Clock()
+		self.screen = pygame.display.set_mode((800, 600))
+		self.height = self.screen.get_height()
 
 		filepath = os.path.dirname(__file__)
 		fishing_assets = pygame.image.load(filepath + '/fishing.png')
@@ -340,65 +343,147 @@ class FishingGame:
 
 		self.progress_bar.draw(screen)
 
-	def tick(self, is_playerbutton_pressed: bool):
-		# calculate time delta since last tick in seconds
-		new_time = self.clock.now().nanoseconds
-		time_delta = (new_time - self.last_time) / 1e9
-		self.last_time = new_time
+		pygame.display.flip()
 
+
+	def tick(self, is_playerbutton_pressed: bool):
+		timedelta_s = self.clock.tick(60) / 1000.0
 		# update game logic
-		self.bar_pct = self.player_bar.tick(time_delta, is_playerbutton_pressed)
+		self.bar_pct = self.player_bar.tick(timedelta_s, is_playerbutton_pressed)
 		self._update_fish_collision()
-		self.reel.tick(time_delta, self.fish_in_fishing_bar)
-		self.fish.tick(time_delta, self.fish_in_fishing_bar)
+		self.reel.tick(timedelta_s, self.fish_in_fishing_bar)
+		self.fish.tick(timedelta_s, self.fish_in_fishing_bar)
 		self.fish_pct = self.fish.get_fish_relative_to_bar_pct(self.player_bar.get_height_px())
 
-		self.progress_pct = self.progress_bar.tick(self.fish_in_fishing_bar, time_delta)
+		self.progress_pct = self.progress_bar.tick(self.fish_in_fishing_bar, timedelta_s)
 
 		# update screen
 		self.draw(self.screen)
+	
+	def get_pygame_events(self):
+		return pygame.event.get()
+
+	def __del__( self ):
+		self.screen = None
+		self.background_asset = None
+		self.fishing_background_position = None
+		self.player_bar = None
+		self.fish = None
+		self.reel = None
+		self.progress_bar = None
+		self.fish_in_fishing_bar = None
+		self.fish_pct = None
+		self.bar_pct = None
+		self.progress_pct = None
+		self.last_time = None
+		pygame.display.quit()
+		pygame.quit()
 
 class FishingNode(Node):
 	def __init__(self):
 		super().__init__('fishing_node')
 		self.get_logger().info('Fishing node started')
-		pygame.init()
-		self.fishing_game = FishingGame(pygame.display.set_mode((800, 600)), 600, 0, 0, self.get_clock())
-		timer_period = 1/60  # timer for 60 FPS
-		self.timer = self.create_timer(timer_period, self.timer_callback)
+		# self.timer = self.create_timer(timer_period, self.timer_callback)
+
+
+		# Initialize action server
+		self.fishing_action_server = ActionServer(
+			self,	
+			Fishing,
+			'fish',
+			self.execute_callback,
+			goal_callback=self.new_goal_callback,
+		)
+
+		self.current_goal = None
+
+	def new_goal_callback(self, goal_handle: rclpy.action.server.ServerGoalHandle):
+		# only one goal at a time
+		if self.current_goal is not None:
+			self.get_logger().info('Goal rejected: another goal is already being executed')
+			return rclpy.action.server.GoalResponse.REJECT
+		self.get_logger().info('Goal accepted')
+		self.current_goal = goal_handle
+		return rclpy.action.server.GoalResponse.ACCEPT
+
+	def execute_callback(self, goal_handle: rclpy.action.server.ServerGoalHandle):
+		# actually start the game and game logic loop
+		executing_game = True
+		fishing_game = FishingGame()
 
 		# Initialize publishers
-		self.fish_pct_publisher = self.create_publisher(Float64, 'fish_pct', 10)
-		self.bar_pct_publisher = self.create_publisher(Float64, 'bar_pct', 10)
-		self.progress_pct_publisher = self.create_publisher(Float64, 'progress_pct', 10)
-		self.fish_in_fishing_bar_publisher = self.create_publisher(Bool, 'fish_in_fishing_bar', 10)
+		goal_id_string = uuid.UUID(bytes=bytes(goal_handle.goal_id.uuid)).hex
+		self.get_logger().info('goal id: %s' % goal_id_string)
+		fish_pct_publisher = self.create_publisher(Float64, '/fish_pct/id_' + goal_id_string, 10)
+		bar_pct_publisher = self.create_publisher(Float64, '/bar_pct/id_' + goal_id_string, 10)
+		fish_in_fishing_bar_publiser = self.create_publisher(Bool, '/fish_in_fishing_bar/id_' + goal_id_string, 10)
 
-	def timer_callback(self):
-		for event in pygame.event.get():
-			if event.type == pygame.QUIT:
-				pygame.quit()
-				self.destroy_node()
-				rclpy.shutdown()
-				return
+		result = Fishing.Result()
+		result.message = 'Fish name should go here!'
+		is_player_button_pressed = False
 
-		# game logic
-		is_player_button_pressed = pygame.mouse.get_pressed()[0]
-		# self.get_logger().info(f'Player button pressed: {is_player_button_pressed}')
-		self.fishing_game.tick(is_player_button_pressed)
+		while executing_game:
+			for event in fishing_game.get_pygame_events():
+				if event.type == pygame.QUIT:
+					goal_handle.abort()
+					executing_game = False
+				if event.type == pygame.KEYUP:
+					if event.key == pygame.K_SPACE:
+						is_player_button_pressed = False
+				if event.type == pygame.KEYDOWN:
+					if event.key == pygame.K_ESCAPE:
+						goal_handle.abort()
+						executing_game = False
+					if event.key == pygame.K_SPACE:
+						is_player_button_pressed = True
 
-		# publish game data
-		fish_pct_msg = Float64()
-		fish_pct_msg.data = float(self.fishing_game.fish_pct)
-		self.fish_pct_publisher.publish(fish_pct_msg)
-		bar_pct_msg = Float64()
-		bar_pct_msg.data = float(self.fishing_game.bar_pct)
-		self.bar_pct_publisher.publish(bar_pct_msg)
-		progress_pct_msg = Float64()
-		progress_pct_msg.data = float(self.fishing_game.progress_pct)
-		self.progress_pct_publisher.publish(progress_pct_msg)
-		fish_in_fishing_bar_msg = Bool()
-		fish_in_fishing_bar_msg.data = self.fishing_game.fish_in_fishing_bar
-		self.fish_in_fishing_bar_publisher.publish(fish_in_fishing_bar_msg)
+			# TODO: test this
+			if goal_handle.is_cancel_requested:
+				self.get_logger().info('Goal cancelled')
+				goal_handle.canceled()
+				executing_game = False
+				
+			# game logic
+			fishing_game.tick(is_player_button_pressed)
 
-		# flip() the display to put your work on screen
-		pygame.display.flip()
+			# publish game data
+			fish_pct_msg = Float64()
+			fish_pct_msg.data = float(fishing_game.fish_pct)
+			fish_pct_publisher.publish(fish_pct_msg)
+			bar_pct_msg = Float64()
+			bar_pct_msg.data = float(fishing_game.bar_pct)
+			bar_pct_publisher.publish(bar_pct_msg)
+
+			#this will be published as a goal feedback
+			progress_pct_feedback = Fishing.Feedback()
+			progress_pct_feedback.progress = fishing_game.progress_pct
+			goal_handle.publish_feedback(progress_pct_feedback)
+
+			fish_in_fishing_bar_msg = Bool()
+			fish_in_fishing_bar_msg.data = fishing_game.fish_in_fishing_bar
+			fish_in_fishing_bar_publiser.publish(fish_in_fishing_bar_msg)
+
+			
+
+			# check if the game is over
+			# if fishing_game.progress_pct >= 1.0:
+			# 	self.get_logger().info('Game won')
+			# 	executing_game = False
+			# 	goal_handle.succeed()
+			# 	result.success = True
+			# elif fishing_game.progress_pct <= 0.0:
+			# 	self.get_logger().info('Game lost')
+			# 	executing_game = False
+			# 	goal_handle.abort()
+			# 	result.success = False
+
+		fishing_game = None
+		self.get_logger().info('Game ended')
+
+		# remove publishers
+		self.destroy_publisher(fish_pct_publisher)
+		self.destroy_publisher(bar_pct_publisher)
+		self.destroy_publisher(fish_in_fishing_bar_publiser)
+
+		self.current_goal = None
+		return result

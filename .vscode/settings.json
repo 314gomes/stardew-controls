@@ -1,0 +1,4 @@
+{
+	"ros.distro": "humble",
+	"python.analysis.extraPaths": ["", "./install/ros_fishing_interfaces/local/lib/python3.10/dist-packages", ".build/ros_fishing", ".install/ros_fishing/lib/python3.10/site-packages", "/opt/ros/humble/lib/python3.10/site-packages", "/opt/ros/humble/local/lib/python3.10/dist-packages", "/opt/ros/humble/ros_fishing/lib/python3.10/site-packages", "/usr/lib/python310.zip", "/usr/lib/python3.10", "/usr/lib/python3.10/lib-dynload", "/home/gomes/.local/lib/python3.10/site-packages", "/usr/local/lib/python3.10/dist-packages", "/usr/lib/python3/dist-packages"]
+}
