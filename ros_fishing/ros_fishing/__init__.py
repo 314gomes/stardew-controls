@@ -1,36 +1,17 @@
 from . import fishing
 import rclpy
+import rclpy.executors
 
 def main():
-	#spin node
-
     rclpy.init()
     node = fishing.FishingNode()
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         node.destroy_node()
         rclpy.shutdown()
-    
-    ...
-	# # pygame setup
-    # pygame.init()
-    # screen = pygame.display.set_mode((800, 600))
-
-    # pygame.display.set_caption("Fishing Game")
-
-    # clock = pygame.time.Clock()
-    # running = True
-
-    # fishing_game = fishing.FishingGame(screen.get_height(), 0, 0, clock)
-
-    # while running:
-    #     # poll for events
-    #     # pygame.QUIT event means the user clicked X to close your window
-    #     
-
-    #     clock.tick(60)  # limits FPS
-
-    # pygame.quit()

@@ -15,6 +15,8 @@ from ros_fishing_interfaces.action import Fishing
 from example_interfaces.action import Fibonacci
 from rclpy.action import ActionServer
 
+import threading
+
 class FishingProgressBar:
 	def __init__(self, scale_factor):
 		self.scale_factor = scale_factor
@@ -396,15 +398,19 @@ class FishingNode(Node):
 		)
 
 		self.current_goal = None
+		self.current_goal_lock = threading.Lock()
+
 		self.button_msgs = dict()
+		self.button_msgs_lock = threading.Lock()
 
 	def new_goal_callback(self, goal_handle: rclpy.action.server.ServerGoalHandle):
 		# only one goal at a time
-		if self.current_goal is not None:
-			self.get_logger().info('Goal rejected: another goal is already being executed')
-			return rclpy.action.server.GoalResponse.REJECT
-		self.get_logger().info('Goal accepted')
-		self.current_goal = goal_handle
+		with self.current_goal_lock:
+			if self.current_goal is not None:
+				self.get_logger().info('Goal rejected: another goal is already being executed')
+				return rclpy.action.server.GoalResponse.REJECT
+			self.get_logger().info('Goal accepted')
+			self.current_goal = goal_handle
 		return rclpy.action.server.GoalResponse.ACCEPT
 
 	def execute_callback(self, goal_handle: rclpy.action.server.ServerGoalHandle):
@@ -433,13 +439,11 @@ class FishingNode(Node):
 		is_player_button_pressed = False
 
 		while executing_game:
-			# listen to button state topic
-			rclpy.spin_once(self, timeout_sec=0.01)
-
 			# check if the button is pressed
-			if self.button_msgs.get(goal_id_string, None) is not None:
-				is_player_button_pressed = self.button_msgs[goal_id_string]
-				self.button_msgs[goal_id_string] = None # message was read!
+			with self.button_msgs_lock:
+				if self.button_msgs.get(goal_id_string, None) is not None:
+					is_player_button_pressed = self.button_msgs[goal_id_string]
+					self.button_msgs[goal_id_string] = None # message was read!
 			
 			# check for button presses on window
 			for event in fishing_game.get_pygame_events():
@@ -504,9 +508,13 @@ class FishingNode(Node):
 		# remove listener
 		self.destroy_subscription(button_listener)
 
-		self.current_goal = None
+		# reset current_goal safely
+		with self.current_goal_lock:
+			self.current_goal = None
+
 		return result
 	
 	def button_listener_callback(self, msg:Bool, goal_id_string: str):
 		self.get_logger().debug('Button state: %s' % msg.data + "for id:" + goal_id_string)
-		self.button_msgs[goal_id_string] = msg.data
+		with self.button_msgs_lock:
+			self.button_msgs[goal_id_string] = msg.data
