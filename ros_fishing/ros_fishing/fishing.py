@@ -435,7 +435,7 @@ class FishingNode(Node):
 		)
 
 		result = Fishing.Result()
-		result.message = 'Fish name should go here!'
+		result.fish_name = 'Fish name should go here!'
 		is_player_button_pressed = False
 
 		while executing_game:

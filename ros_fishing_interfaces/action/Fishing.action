@@ -5,7 +5,7 @@
 
 # Result
 bool success
-string message
+string fish_name
 
 ---
 
