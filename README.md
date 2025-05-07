@@ -20,14 +20,16 @@ To build and source the project with ROS 2 Humble, follow these steps:
 2. **Build the Workspace**
    - Navigate to the workspace root and build the project:
      ```bash
+     rosdep install -i --from-path . --rosdistro humble -y
      colcon build
      ```
 
 3. **Source the Workspace**
    - Source the setup file to overlay the workspace on your ROS 2 environment:
      ```bash
-     source ~/ros2_ws/install/setup.bash
+     source install/setup.bash
      ```
+
 
 4. **Run the Project**
    - After sourcing, you can run the project using:

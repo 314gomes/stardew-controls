@@ -5,7 +5,7 @@ package_name = 'ros_fishing'
 setup(
     name=package_name,
     version='0.0.0',
-    packages=find_packages(exclude=['test'], include=['ros_fishing_interfaces']),
+    packages=find_packages(include=['ros_fishing', 'ros_fishing*']),
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -20,7 +20,6 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-			'fishing = ros_fishing.__init__:main', 
-        ],
+			'fishing = ros_fishing.__init__:main', ],
     },
 )
